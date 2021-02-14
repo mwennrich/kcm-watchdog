@@ -19,8 +19,6 @@ const (
 var (
 	rootCmd = &cobra.Command{
 		Use:          programName,
-		Short:        "checking for broken kube-controller-manager and restart if needed",
-		Long:         "",
 		SilenceUsage: true,
 	}
 )
@@ -41,7 +39,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().Duration("checkinterval", 30*time.Second, "time between nodeReady checks")
-	rootCmd.PersistentFlags().Int("kcm-max-checks", 5, "number of checks till kcm is marked as failed")
+	rootCmd.PersistentFlags().Int("kcm-max-fails", 5, "number of checks till kcm is marked as failed and restarted")
 
 	rootCmd.AddCommand(checkCmd)
 

@@ -20,12 +20,12 @@ import (
 var (
 	checkCmd = &cobra.Command{
 		Use:   "check",
-		Short: "check for known problems",
+		Short: "check for broken kube-controller-manager deployment and restart if needed",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return checkNRestart(args)
 		},
 	}
-	kcmStatus map[string]int
+	kcmErrs map[string]int
 )
 
 func init() {
@@ -46,7 +46,7 @@ func checkNRestart(args []string) error {
 		panic(err.Error())
 	}
 
-	kcmStatus = make(map[string]int)
+	kcmErrs = make(map[string]int)
 
 	ticker := time.NewTicker(time.Duration(viper.GetDuration("checkinterval")))
 
@@ -77,18 +77,18 @@ func checkKCMs(c *kubernetes.Clientset) error {
 			return err
 		}
 		if kcm.Status.UnavailableReplicas > 0 {
-			kcmStatus[ns.Name]++
-			klog.Warningf("kube-controller-manager of %s has unavailable replicas (count %d)", ns.Name, kcmStatus[ns.Name])
+			kcmErrs[ns.Name]++
+			klog.Warningf("kube-controller-manager of %s has unavailable replicas (count %d)", ns.Name, kcmErrs[ns.Name])
 		} else {
-			kcmStatus[ns.Name] = 0
+			kcmErrs[ns.Name] = 0
 		}
 	}
 	return nil
 }
 
 func restartKCMs(c *kubernetes.Clientset) error {
-	for ns, cn := range kcmStatus {
-		if cn > viper.GetInt("kcm-max-checks") {
+	for ns, cn := range kcmErrs {
+		if cn >= viper.GetInt("kcm-max-fails") {
 			d := c.AppsV1().Deployments(ns)
 			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				result, err := d.Get(context.Background(), "kube-controller-manager", v1.GetOptions{})
@@ -104,7 +104,7 @@ func restartKCMs(c *kubernetes.Clientset) error {
 				return err
 			}
 			klog.Infof("kube-controller-manager in namespace %q restarted", ns)
-			kcmStatus[ns] = 0
+			kcmErrs[ns] = 0
 		}
 	}
 	return nil
