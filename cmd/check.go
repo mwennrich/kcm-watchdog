@@ -34,7 +34,7 @@ func init() {
 
 func checkNRestart(args []string) error {
 
-	klog.Infoln("Starting kcm-watchdog on node")
+	klog.Infoln("Starting kcm-watchdog")
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic(err.Error())
