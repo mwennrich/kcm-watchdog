@@ -1,4 +1,4 @@
-module github.com/mwennrich/kcm-watchdog
+module github.com/mwennrich/shoot-watchdog
 
 go 1.15
 

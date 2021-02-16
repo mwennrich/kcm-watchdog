@@ -6,6 +6,6 @@ WORKDIR /work
 RUN make
 
 FROM alpine:3.12
-COPY --from=builder /work/bin/kcm-watchdog /kcm-watchdog
+COPY --from=builder /work/bin/shoot-watchdog /shoot-watchdog
 USER root
-ENTRYPOINT ["/kcm-watchdog","check"]
+ENTRYPOINT ["/shoot-watchdog","check"]

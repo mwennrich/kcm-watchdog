@@ -1,4 +1,4 @@
-# kcm-watchdog
+# shoot-watchdog
 
 ***ALPHA version***
 
@@ -6,20 +6,20 @@
 
 ```text
 Usage:
-  kcm-watchdog [command]
+  shoot-watchdog [command]
 
 Available Commands:
-  check       check for broken kube-controller-manager deployment and restart if needed
+  check       check for broken shoot deployments and restart if needed
   help        Help about any command
 
 Flags:
-      --checkinterval duration   time between nodeReady checks (default 30s)
-  -h, --help                     help for kcm-watchdog
-      --kcm-max-fails int       number of checks till kcm is marked as failed (default 5)
+      --checkinterval duration    time between nodeReady checks (default 60s)
+  -h, --help                      help for shoot-watchdog
+      --shoot-max-fails int       number of checks till shoot is marked as failed (default 5)
 ```
 
 ## Example
 
 ```bash
-kubectl apply -f deploy/kcm-watchdog.yaml
+kubectl apply -f deploy/shoot-watchdog.yaml
 ```

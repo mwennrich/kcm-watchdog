@@ -1,20 +1,20 @@
 GO111MODULE := on
 DOCKER_TAG := $(or ${GITHUB_TAG_NAME}, latest)
 
-all: kcm-watchdog
+all: shoot-watchdog
 
-.PHONY: kcm-watchdog
-kcm-watchdog:
-	go build -o bin/kcm-watchdog
-	strip bin/kcm-watchdog
+.PHONY: shoot-watchdog
+shoot-watchdog:
+	go build -o bin/shoot-watchdog
+	strip bin/shoot-watchdog
 
 .PHONY: dockerimages
 dockerimages:
-	docker build -t mwennrich/kcm-watchdog:${DOCKER_TAG} .
+	docker build -t mwennrich/shoot-watchdog:${DOCKER_TAG} .
 
 .PHONY: dockerpush
 dockerpush:
-	docker push mwennrich/kcm-watchdog:${DOCKER_TAG}
+	docker push mwennrich/shoot-watchdog:${DOCKER_TAG}
 
 .PHONY: clean
 clean:

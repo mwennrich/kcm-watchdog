@@ -3,9 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/kubernetes"
@@ -18,23 +18,23 @@ import (
 )
 
 var (
-	checkCmd = &cobra.Command{
+	checkShoot = &cobra.Command{
 		Use:   "check",
-		Short: "check for broken kube-controller-manager deployment and restart if needed",
+		Short: "check for broken shoot deployments and restart if needed",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return checkNRestart(args)
 		},
 	}
-	kcmErrs map[string]int
+	deplErrs map[string]int
 )
 
 func init() {
-	viper.BindPFlags(checkCmd.Flags())
+	viper.BindPFlags(checkShoot.Flags())
 }
 
 func checkNRestart(args []string) error {
 
-	klog.Infoln("Starting kcm-watchdog")
+	klog.Infoln("Starting shoot-watchdog")
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic(err.Error())
@@ -46,16 +46,16 @@ func checkNRestart(args []string) error {
 		panic(err.Error())
 	}
 
-	kcmErrs = make(map[string]int)
+	deplErrs = make(map[string]int)
 
 	ticker := time.NewTicker(time.Duration(viper.GetDuration("checkinterval")))
 
 	for ; true; <-ticker.C {
-		err := checkKCMs(c)
+		err := checkDeployments(c)
 		if err != nil {
 			return err
 		}
-		err = restartKCMs(c)
+		err = restartDeployments(c)
 		if err != nil {
 			return err
 		}
@@ -63,48 +63,55 @@ func checkNRestart(args []string) error {
 	return nil
 }
 
-func checkKCMs(c *kubernetes.Clientset) error {
+func checkDeployments(c *kubernetes.Clientset) error {
 	namespaces, err := c.CoreV1().Namespaces().List(context.Background(), v1.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for _, ns := range namespaces.Items {
-		kcm, err := c.AppsV1().Deployments(ns.Name).Get(context.Background(), "kube-controller-manager", v1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if !strings.Contains(ns.Name, "shoot--") {
 			continue
 		}
+		deployments, err := c.AppsV1().Deployments(ns.Name).List(context.Background(), v1.ListOptions{})
 		if err != nil {
 			return err
 		}
-		if kcm.Status.UnavailableReplicas > 0 {
-			kcmErrs[ns.Name]++
-			klog.Warningf("kube-controller-manager of %s has unavailable replicas (count %d)", ns.Name, kcmErrs[ns.Name])
-		} else {
-			kcmErrs[ns.Name] = 0
+		for _, depl := range deployments.Items {
+			if depl.Status.UnavailableReplicas > 0 {
+				deplErrs[ns.Name+"/"+depl.Name]++
+				klog.Warningf("%s of %s has unavailable replicas (count %d)", depl.Name, ns.Name, deplErrs[ns.Name+"/"+depl.Name])
+			} else {
+				deplErrs[ns.Name+"/"+depl.Name] = 0
+			}
 		}
 	}
 	return nil
 }
 
-func restartKCMs(c *kubernetes.Clientset) error {
-	for ns, cn := range kcmErrs {
-		if cn >= viper.GetInt("kcm-max-fails") {
-			d := c.AppsV1().Deployments(ns)
+func restartDeployments(c *kubernetes.Clientset) error {
+	for i, cn := range deplErrs {
+		depls := strings.Split(i, "/")
+		if len(depls) != 2 {
+			klog.Errorf("something went horrible wrong %s", i)
+			continue
+		}
+		if cn >= viper.GetInt("depl-max-fails") {
+			d := c.AppsV1().Deployments(depls[0])
 			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				result, err := d.Get(context.Background(), "kube-controller-manager", v1.GetOptions{})
+				result, err := d.Get(context.Background(), depls[1], v1.GetOptions{})
 				if err != nil {
-					klog.Errorf("Failed to get latest version of kube-controller-manager in namespace %s: %s", ns, err)
+					klog.Errorf("Failed to get latest version of %s in namespace %s: %s", depls[1], depls[0], err)
 				}
 
-				result.Spec.Template.ObjectMeta.Labels["kcm-watchdog-restarted"] = fmt.Sprintf("%d", time.Now().Unix())
+				result.Spec.Template.ObjectMeta.Labels["shoot-watchdog-restarted"] = fmt.Sprintf("%d", time.Now().Unix())
 				_, err = d.Update(context.Background(), result, v1.UpdateOptions{})
 				return err
 			})
 			if err != nil {
 				return err
 			}
-			klog.Infof("kube-controller-manager in namespace %q restarted", ns)
-			kcmErrs[ns] = 0
+			klog.Infof("%q in namespace %q restarted", depls[1], depls[0])
+			deplErrs[i] = 0
 		}
 	}
 	return nil

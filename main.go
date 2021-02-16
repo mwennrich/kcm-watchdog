@@ -4,7 +4,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/mwennrich/kcm-watchdog/cmd"
+	"github.com/mwennrich/shoot-watchdog/cmd"
 )
 
 func main() {

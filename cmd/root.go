@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	programName = "kcm-watchdog"
+	programName = "shoot-watchdog"
 )
 
 var (
@@ -38,10 +38,10 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().Duration("checkinterval", 30*time.Second, "time between nodeReady checks")
-	rootCmd.PersistentFlags().Int("kcm-max-fails", 5, "number of checks till kcm is marked as failed and restarted")
+	rootCmd.PersistentFlags().Duration("checkinterval", 60*time.Second, "time between nodeReady checks")
+	rootCmd.PersistentFlags().Int("depl-max-fails", 5, "number of checks till shoot is marked as failed and restarted")
 
-	rootCmd.AddCommand(checkCmd)
+	rootCmd.AddCommand(checkShoot)
 
 	err := viper.BindPFlags(rootCmd.PersistentFlags())
 	if err != nil {
